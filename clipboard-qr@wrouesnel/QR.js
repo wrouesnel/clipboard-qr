@@ -7,7 +7,8 @@ const Lang = imports.lang;
 const Clutter = imports.gi.Clutter;
 const St = imports.gi.St;
 
-//const AppletDir = imports.ui.appletManager.appletMeta['clipboard-qr@wrouesnel'].path;
+const AppletDir = imports.ui.appletManager.appletMeta['clipboard-qr@wrouesnel'].path;
+imports.ui.searchPath.unshift(AppletDir);
 const QRLibrary = imports.ui.QRLib;
 
 const QR_Blocksize = 5;

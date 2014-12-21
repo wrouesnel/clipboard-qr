@@ -23,7 +23,8 @@ const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 //const DBus = imports.dbus;
 
-//const AppletDir = imports.ui.appletManager.appletMeta['clipboard-qr@wrouesnel'].path;
+const AppletDir = imports.ui.appletManager.appletMeta['clipboard-qr@wrouesnel'].path;
+imports.ui.searchPath.unshift(AppletDir);
 const QRLib = imports.ui.QR;
 
 function MyApplet(orientation) {
