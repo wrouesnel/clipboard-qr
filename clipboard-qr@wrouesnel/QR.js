@@ -47,7 +47,8 @@ QR.prototype = {
         for (let i = 0; i < length; ++i) {
             for (let j = 0; j < length; ++j) {
                 if (this._qrdata[i][j]) {
-                    context.rectangle(QR_Blocksize * (j + 1), QR_Blocksize * (i + 1), QR_Blocksize, QR_Blocksize);
+                    context.rectangle(QR_Blocksize * (j + 1), QR_Blocksize * (i + 1), 
+                    	QR_Blocksize, QR_Blocksize);
                     context.fill();
                 }
             }
