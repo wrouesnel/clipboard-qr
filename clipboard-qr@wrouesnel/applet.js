@@ -21,7 +21,8 @@ const St = imports.gi.St;
 const PopupMenu = imports.ui.popupMenu;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
-//const DBus = imports.dbus;
+const Gdk = imports.gi.Gdk;
+const GUdev = imports.gi.GUdev;
 
 const Main = imports.ui.main;
 
@@ -30,6 +31,8 @@ imports.ui.searchPath.unshift(AppletDir);
 const QRLib = imports.ui.QR;
 
 const QRReaderHelper = 'clipboard-qr.py';
+
+const MAX_BYTES = 1048576;
 
 function MyApplet(orientation) {
     this._init(orientation);
@@ -62,13 +65,15 @@ MyApplet.prototype = {
             // Add a separator
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             
-            // Add the 'read QR code item'
-            this._captureItem = new PopupMenu.PopupMenuItem(_('Read QR Code'));
-            this.menu.addMenuItem(this._captureItem);
-            this._captureItem.connect('activate', Lang.bind(this, function (menuItem, event) {
-            	this._launch_qr_reader();
-            	return false;
-            }));            
+            // Link to udev to track connected cameras and provide appropriate
+            // capture items on the menu.
+            this.camera_menus = {};	// Track which cameras we have in the menu
+            
+            this.udev_client = new GUdev.Client ({subsystems: ["video4linux"]});
+			this.udev_client.connect ("uevent", Lang.bind(this, this.refresh_cameras));
+			
+			// Populate the menu with an initial list of cameras
+			this.refresh_cameras();
 
             this._qr = new QRLib.QR(0, this._maincontainer);
             
@@ -80,28 +85,54 @@ MyApplet.prototype = {
         }
     },
 
-    _launch_qr_reader: function () {
+    _launch_qr_reader: function (camera_path) {
         try {
             if (this._qrprocess == null) {
-        		global.logError('got to subprocess');
+            	// Spawn the python helper
                 this._qrprocess = Gio.Subprocess.new(
-                    [GLib.build_filenamev([AppletDir,QRReaderHelper]), '/dev/video0'],
+                    [GLib.build_filenamev([AppletDir,QRReaderHelper]), camera_path],
                     Gio.SubprocessFlags.STDOUT_PIPE);
-                let streamOut = Gio.DataInputStream.new(this._qrprocess.get_stdout_pipe());
-                streamOut.read_line_async(0, null, Lang.bind(this, this.on_qr_reader_line));
+				// Read from stdout
+                let streamOut = this._qrprocess.get_stdout_pipe();
+                streamOut.read_bytes_async(MAX_BYTES, 0, null, Lang.bind(this, function (o,result) {
+                	let data = o.read_bytes_finish(result);
+                	let clipboard = St.Clipboard.get_default();
+			        clipboard.set_text(data.get_data().toString());    
+                }));
+
+                this._qrprocess.wait_async(null, Lang.bind(this, function(o,result) {
+                	this._qrprocess = null;
+                	o.wait_finish(result);
+                }));
             }
         } catch (e) {
             global.logError(e);
         }
     },
 
-	on_qr_reader_line: function (obj, aresult) {
-        let [lineout, length] = obj.read_line_finish(aresult);
-        let clipboard = St.Clipboard.get_default();
-        clipboard.set_text(lineout.toString());
-
-        this._qrprocess.force_exit();
-        this._qrprocess = null;
+	// Dynamically updates the applet menu as cameras are plugged/unplugged
+	refresh_cameras: function () {
+		// Refresh camera list
+		for (item in this.camera_menus) {
+			this.menu.remove(item);
+		}
+		this.camera_menus = {};
+		
+		let camera_devices = this.udev_client.query_by_subsystem ("video4linux");
+		for (var n = 0; n < camera_devices.length; n++) {
+			let devfile = camera_devices[n].get_device_file ();
+			let description = camera_devices[n].get_property('ID_V4L_PRODUCT');
+			
+            let menuItem = new PopupMenu.PopupMenuItem(_('Scan QR Code') + ' (' + description +')');
+            
+            menuItem.connect('activate', Lang.bind(this, function (menuItem, event) {
+            	this._launch_qr_reader(devfile);
+            	return false;
+            }));
+            
+            this.menu.addMenuItem(menuItem);
+            this.camera_menus[devfile+description] = menuItem;
+		}
 	},
 
     on_applet_clicked: function(event) {
