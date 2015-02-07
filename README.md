@@ -12,4 +12,8 @@ Requirements
 ```
 apt-get install python-zbar
 ```
-That's it!
+That's it! Simply copy the clipboard-qr@wrouesnel folder to your ./local/cinnamon/applets directory to install.
+
+Or install directly from the Cinnamon Applets configuration panel. Or download a binary from http://cinnamon-spices.linuxmint.com/applets/view/213
+
+![](screenshot.png?raw=true)
