@@ -63,9 +63,12 @@ MyApplet.prototype = {
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             
             // Add the 'read QR code item'
-            this._captureItem = new Applet.MenuItem(_('Read QR Code'), 
-            	'', Lang.bind(this, this._launch_qr_reader));
+            this._captureItem = new PopupMenu.PopupMenuItem(_('Read QR Code'));
             this.menu.addMenuItem(this._captureItem);
+            this._captureItem.connect('activate', Lang.bind(this, function (menuItem, event) {
+            	this._launch_qr_reader();
+            	return false;
+            }));            
 
             this._qr = new QRLib.QR(0, this._maincontainer);
             
@@ -79,12 +82,13 @@ MyApplet.prototype = {
 
     _launch_qr_reader: function () {
         try {
-            if (this._qrprocess != null) {
+            if (this._qrprocess == null) {
+        		global.logError('got to subprocess');
                 this._qrprocess = Gio.Subprocess.new(
-                    [GLib.build_filenamev([AppletDir,QRReaderHelper]), '/dev/video1'],
+                    [GLib.build_filenamev([AppletDir,QRReaderHelper]), '/dev/video0'],
                     Gio.SubprocessFlags.STDOUT_PIPE);
                 let streamOut = Gio.DataInputStream.new(this._qrprocess.get_stdout_pipe());
-                streamOut.read_line_async(0, null, this.on_qr_reader_line);
+                streamOut.read_line_async(0, null, Lang.bind(this, this.on_qr_reader_line));
             }
         } catch (e) {
             global.logError(e);
@@ -93,7 +97,6 @@ MyApplet.prototype = {
 
 	on_qr_reader_line: function (obj, aresult) {
         let [lineout, length] = obj.read_line_finish(aresult);
-
         let clipboard = St.Clipboard.get_default();
         clipboard.set_text(lineout.toString());
 
